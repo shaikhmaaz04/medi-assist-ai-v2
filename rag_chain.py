@@ -1,4 +1,5 @@
 import os
+import shutil
 from operator import itemgetter
 from dotenv import load_dotenv
 
@@ -17,7 +18,29 @@ CHROMA_DIR = "chroma_store"
 COLLECTION = "fasting_research"
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 LLM_MODEL = "llama-3.3-70b-versatile"
-# LLM_MODEL = "llama-3.1-8b-instant"
+
+# --- SINGLETON DATABASE CONNECTION ---
+# This ensures we only ever open one connection to SQLite, preventing read/write locks.
+_vectorstore = None
+
+def get_vectorstore():
+    """Returns the active database connection, creating it if it doesn't exist."""
+    global _vectorstore
+    if _vectorstore is None:
+        embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
+        _vectorstore = Chroma(
+            persist_directory=CHROMA_DIR,
+            embedding_function=embeddings,
+            collection_name=COLLECTION
+        )
+    return _vectorstore
+
+def clear_database():
+    """Safely releases the database connection and deletes the files."""
+    global _vectorstore
+    _vectorstore = None  # Release the active connection so the OS allows deletion
+    if os.path.exists(CHROMA_DIR):
+        shutil.rmtree(CHROMA_DIR)
 
 def format_docs(docs):
     """Injects Title, Citation, AND PMID into the context block."""
@@ -44,7 +67,6 @@ def ingest_new_articles(articles):
     all_chunks = []
     
     for art in articles:
-        # Format the abstract dictionary into a string
         abstract_data = art.get('abstract', {})
         if isinstance(abstract_data, dict):
             full_abstract = "\n".join([f"{k}: {v}" for k, v in abstract_data.items()])
@@ -53,7 +75,6 @@ def ingest_new_articles(articles):
             
         content_for_ai = f"STUDY: {art['title']}\nFINDINGS: {full_abstract}"
         
-        # Build a clean citation string
         authors = art.get('authors', 'No Authors')
         author_names = authors.split(',')
         last_name = author_names[0].split(' ')[-1] if authors != "No Authors" else "Unknown"
@@ -61,7 +82,6 @@ def ingest_new_articles(articles):
         pmid = art.get('pmid', 'N/A')
         citation = f"{last_name} et al., {pub_date} (PMID: {pmid})"
 
-        # Split and package into LangChain Documents
         chunks = text_splitter.split_text(content_for_ai)
         for i, chunk in enumerate(chunks):
             all_chunks.append(Document(
@@ -78,51 +98,41 @@ def ingest_new_articles(articles):
     if not all_chunks:
         return 0
 
-    # Embed and store directly in the active ChromaDB collection
-    embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
-    vectorstore = Chroma(
-        persist_directory=CHROMA_DIR,
-        embedding_function=embeddings,
-        collection_name=COLLECTION
-    )
-    vectorstore.add_documents(all_chunks)
+    # Use the global singleton connection to append data safely
+    vs = get_vectorstore()
+    vs.add_documents(all_chunks)
     
     return len(all_chunks)
 
 def get_mediassist_chain():
     """Builds the RAG pipeline. Returns None if the database is empty."""
     if not os.path.exists(CHROMA_DIR):
-        # Gracefully handle empty states before the user ingests data
         return None
 
-    embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
-    vectorstore = Chroma(
-        persist_directory=CHROMA_DIR,
-        embedding_function=embeddings,
-        collection_name=COLLECTION
-    )
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+    # Use the same global connection for retrieval
+    vs = get_vectorstore()
+    retriever = vs.as_retriever(search_kwargs={"k": 5})
 
-   
-    llm = ChatGroq(model_name=LLM_MODEL, temperature=0.5, max_tokens=4500)
+    llm = ChatGroq(model_name=LLM_MODEL, temperature=0.0, max_tokens=4500)
 
     system_prompt = (
-        "You are MediAssist AI, a clinical research assistant. "
-        "Answer ONLY using the CURRENT CONTEXT provided below. "
-        "Do not use outside or general knowledge.\n\n"
-
-        "If the CURRENT CONTEXT does not contain the answer, "
-        "reply ONLY with:\n"
-        "'The current database lacks this specific information.'\n"
-        "Do not add anything else.\n\n"
-
-        "If the answer exists in the CURRENT CONTEXT:\n"
-        "1. Write a clear, detailed and combined explanation from the context.\n"
-        "2. Add inline citations for every clinical claim using this exact format: [PMID: XXXXXX]\n"
-        "3. Include important metrics when available (example: HbA1c changes, weight loss, percentages).\n"
-        "4. End with a short 2-3 sentence Executive Summary.\n"
-        "5. Add a numbered References section at the end containing ONLY the cited papers and their titles.\n\n"
-
+        "You are MediAssist AI, a highly accurate clinical research assistant. "
+        "Your ONLY source of truth is the CURRENT CONTEXT provided below. "
+        "You are strictly forbidden from using pre-trained general knowledge.\n\n"
+        "CRITICAL INSTRUCTION:\n"
+        "First, determine if the CURRENT CONTEXT contains the SPECIFIC answer to the user's question. "
+        "Just because the context mentions a general topic (e.g., a drug name) does NOT mean it contains the specific answer.\n\n"
+        "IF THE CONTEXT LACKS THE SPECIFIC ANSWER:\n"
+        "You MUST reply EXACTLY and ONLY with this phrase: 'The current database lacks this specific information.'\n"
+        "Do NOT add 'However...'. Do NOT use PMIDs from your internal memory. Stop generating immediately.\n\n"
+        "IF THE CONTEXT CONTAINS THE EXACT ANSWER:\n"
+        "Follow these strict formatting guidelines:\n"
+        "1. SYNTHESIS: Merge findings from the CURRENT CONTEXT into a cohesive narrative.\n"
+        "2. CITATIONS: Every clinical claim must have a concise inline citation using ONLY the ID from the context, formatted exactly as: [PMID: XXXXXX]. "
+        "CRITICAL: Do NOT invent PMIDs. If a PMID is not physically present in the CURRENT CONTEXT below, you cannot use it.\n"
+        "3. DETAIL: Include specific metrics when available.\n"
+        "4. CLINICAL SUMMARY: Conclude with a 2-3 sentence 'Executive Summary'.\n"
+        "5. REFERENCES: Provide a numbered list of ONLY the papers cited in this specific response at the very end. The list should contain the respective paper titles as well.\n\n"
         "CURRENT CONTEXT:\n{context}"
     )
 
