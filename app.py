@@ -29,10 +29,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-@st.cache_resource
-def load_rag_chain():
-    return get_mediassist_chain()
-
+# Keep caching for the LLM itself, but NOT the database chain
 @st.cache_resource
 def load_chitchat_llm():
     return ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.7)
@@ -91,11 +88,6 @@ with st.sidebar:
             if selected_articles:
                 with st.spinner("Embedding into Vector Database..."):
                     chunks_added = ingest_new_articles(selected_articles)
-                    
-                    # CRITICAL FIX: We MUST clear the cache here so Streamlit stops returning "None" 
-                    # and successfully connects to the newly created database!
-                    load_rag_chain.clear()
-                    
                     st.success(f"✅ Success! Added {len(selected_articles)} articles ({chunks_added} chunks).")
             else:
                 st.warning("Please select at least one article to ingest.")
@@ -116,7 +108,6 @@ with st.sidebar:
             st.session_state.messages = []
             st.session_state.last_sources = []
             st.session_state.fetched_articles = []
-            load_rag_chain.clear()
             st.rerun()
 
     st.divider()
@@ -181,7 +172,9 @@ if prompt := st.chat_input("Ask a clinical question about the ingested documents
                     
         else:
             with st.spinner("Analyzing PubMed evidence..."):
-                chain = load_rag_chain()
+                
+                # CRITICAL FIX: Direct call without caching! Always gets the latest database state.
+                chain = get_mediassist_chain()
                 
                 if chain:
                     try:

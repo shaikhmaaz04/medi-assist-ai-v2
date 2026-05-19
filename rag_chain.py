@@ -12,15 +12,16 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 
-# --- CONFIGURATION ---
 load_dotenv()
-CHROMA_DIR = "chroma_store"
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CHROMA_DIR = os.path.join(BASE_DIR, "live_workspace") 
+
 COLLECTION = "fasting_research"
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 LLM_MODEL = "llama-3.3-70b-versatile"
 
 # --- SINGLETON DATABASE CONNECTION ---
-# This ensures we only ever open one connection to SQLite, preventing read/write locks.
 _vectorstore = None
 
 def get_vectorstore():
@@ -38,12 +39,11 @@ def get_vectorstore():
 def clear_database():
     """Safely releases the database connection and deletes the files."""
     global _vectorstore
-    _vectorstore = None  # Release the active connection so the OS allows deletion
+    _vectorstore = None  
     if os.path.exists(CHROMA_DIR):
         shutil.rmtree(CHROMA_DIR)
 
 def format_docs(docs):
-    """Injects Title, Citation, AND PMID into the context block."""
     formatted_context = []
     for doc in docs:
         title = doc.metadata.get('title', 'Unknown Title')
@@ -59,7 +59,6 @@ def format_docs(docs):
     return "\n\n".join(formatted_context)
 
 def ingest_new_articles(articles):
-    """Dynamically chunks and embeds newly fetched PubMed articles into ChromaDB."""
     if not articles:
         return 0
 
@@ -98,7 +97,6 @@ def ingest_new_articles(articles):
     if not all_chunks:
         return 0
 
-    # Use the global singleton connection to append data safely
     vs = get_vectorstore()
     vs.add_documents(all_chunks)
     
@@ -109,11 +107,11 @@ def get_mediassist_chain():
     if not os.path.exists(CHROMA_DIR):
         return None
 
-    # Use the same global connection for retrieval
     vs = get_vectorstore()
     retriever = vs.as_retriever(search_kwargs={"k": 5})
 
-    llm = ChatGroq(model_name=LLM_MODEL, temperature=0.4)
+    # Strict temperature to prevent hallucinations
+    llm = ChatGroq(model_name=LLM_MODEL, temperature=0.0)
 
     system_prompt = (
         "You are MediAssist AI, a highly accurate clinical research assistant. "
