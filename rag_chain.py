@@ -111,7 +111,7 @@ def get_mediassist_chain():
     retriever = vs.as_retriever(search_kwargs={"k": 5})
 
     # Strict temperature to prevent hallucinations
-    llm = ChatGroq(model_name=LLM_MODEL, temperature=0.0)
+    llm = ChatGroq(model_name=LLM_MODEL, temperature=0.4)
 
     system_prompt = (
         "You are MediAssist AI, a highly accurate clinical research assistant. "
