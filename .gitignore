@@ -1,0 +1,21 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Secrets
+.env
+*.env
+
+# Local Vector Database (Start fresh on deployment)
+chroma_store/
+
+# OS generated files
+.DS_Store
+Thumbs.db

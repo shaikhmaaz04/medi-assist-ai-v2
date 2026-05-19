@@ -1,0 +1,21 @@
+[project]
+name = "medi-assist-ai-v2"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "chromadb==1.5.9",
+    "langchain-chroma==1.1.0",
+    "langchain-groq==1.1.2",
+    "langchain-huggingface==1.2.2",
+    "langchain-text-splitters==1.1.2",
+    "onnxruntime<1.24.0",
+    "protobuf==3.20.1",
+    "python-dotenv==1.2.2",
+    "requests==2.34.0",
+    "semantic-router==0.1.12",
+    "sentence-transformers==5.5.0",
+    "streamlit==1.57.0",
+    "torchvision==0.27.0",
+]
