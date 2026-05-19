@@ -102,7 +102,7 @@ This project uses `uv`, a fast Python package installer and dependency manager.
 
 ```bash
 git clone https://github.com/shaikhmaaz04/medi-assist-ai-v2.git
-cd medi-assist-ai
+cd medi-assist-ai-v2
 ```
 
 ### 2. Create a Virtual Environment
@@ -191,5 +191,3 @@ This makes the system significantly more reliable for educational clinical resea
 This project is created strictly for educational and demonstration purposes only.
 
 It is **not intended for commercial deployment, medical diagnosis, treatment, or professional healthcare decision-making**. The generated responses should not be considered medical advice.
-
-Always consult qualified healthcare professionals for medical guidance and treatment decisions.
