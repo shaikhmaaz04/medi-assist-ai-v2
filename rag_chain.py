@@ -113,7 +113,7 @@ def get_mediassist_chain():
     vs = get_vectorstore()
     retriever = vs.as_retriever(search_kwargs={"k": 5})
 
-    llm = ChatGroq(model_name=LLM_MODEL, temperature=0.4, max_tokens=4500)
+    llm = ChatGroq(model_name=LLM_MODEL, temperature=0.4)
 
     system_prompt = (
         "You are MediAssist AI, a highly accurate clinical research assistant. "

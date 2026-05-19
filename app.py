@@ -2,9 +2,7 @@ import streamlit as st
 import re 
 from dotenv import load_dotenv
 import os
-
 from pubmed import PubMedRetriever 
-# NEW: Imported the safe clear_database function
 from rag_chain import get_mediassist_chain, ingest_new_articles, clear_database 
 from router import get_route
 from langchain_groq import ChatGroq
@@ -94,7 +92,9 @@ with st.sidebar:
                 with st.spinner("Embedding into Vector Database..."):
                     chunks_added = ingest_new_articles(selected_articles)
                     
-                    # Because of our new Singleton pattern, we don't need to clear the cache here anymore!
+                    # CRITICAL FIX: We MUST clear the cache here so Streamlit stops returning "None" 
+                    # and successfully connects to the newly created database!
+                    load_rag_chain.clear()
                     
                     st.success(f"✅ Success! Added {len(selected_articles)} articles ({chunks_added} chunks).")
             else:
@@ -112,7 +112,6 @@ with st.sidebar:
             
     with col2:
         if st.button("⚠️ Clear DB"):
-            # Use our new safe deletion tool
             clear_database()
             st.session_state.messages = []
             st.session_state.last_sources = []
