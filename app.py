@@ -29,7 +29,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Keep caching for the LLM itself, but NOT the database chain
 @st.cache_resource
 def load_chitchat_llm():
     return ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.7)
@@ -173,7 +172,6 @@ if prompt := st.chat_input("Ask a clinical question about the ingested documents
         else:
             with st.spinner("Analyzing PubMed evidence..."):
                 
-                # CRITICAL FIX: Direct call without caching! Always gets the latest database state.
                 chain = get_mediassist_chain()
                 
                 if chain:

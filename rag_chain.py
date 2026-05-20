@@ -1,8 +1,8 @@
 import os
-import shutil
 from operator import itemgetter
 from dotenv import load_dotenv
 
+import chromadb 
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
@@ -14,36 +14,41 @@ from langchain_core.documents import Document
 
 load_dotenv()
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CHROMA_DIR = os.path.join(BASE_DIR, "live_workspace") 
-
 COLLECTION = "fasting_research"
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 LLM_MODEL = "llama-3.3-70b-versatile"
 
-# --- SINGLETON DATABASE CONNECTION ---
+# --- IN-MEMORY DATABASE CONNECTION ---
+_chroma_client = None
 _vectorstore = None
 
 def get_vectorstore():
-    """Returns the active database connection, creating it if it doesn't exist."""
-    global _vectorstore
+    """Returns the active in-memory database connection."""
+    global _chroma_client, _vectorstore
     if _vectorstore is None:
+        # EphemeralClient runs entirely in RAM! No disk writes = No Read-Only crashes.
+        _chroma_client = chromadb.EphemeralClient()
         embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
         _vectorstore = Chroma(
-            persist_directory=CHROMA_DIR,
+            client=_chroma_client,
             embedding_function=embeddings,
             collection_name=COLLECTION
         )
     return _vectorstore
 
 def clear_database():
-    """Safely releases the database connection and deletes the files."""
-    global _vectorstore
-    _vectorstore = None  
-    if os.path.exists(CHROMA_DIR):
-        shutil.rmtree(CHROMA_DIR)
+    """Safely drops the in-memory collection and resets the connection."""
+    global _chroma_client, _vectorstore
+    if _chroma_client is not None:
+        try:
+            _chroma_client.delete_collection(COLLECTION)
+        except Exception:
+            pass
+    _chroma_client = None
+    _vectorstore = None
 
 def format_docs(docs):
+    """Injects Title, Citation, AND PMID into the context block."""
     formatted_context = []
     for doc in docs:
         title = doc.metadata.get('title', 'Unknown Title')
@@ -59,6 +64,7 @@ def format_docs(docs):
     return "\n\n".join(formatted_context)
 
 def ingest_new_articles(articles):
+    """Dynamically chunks and embeds newly fetched PubMed articles into RAM."""
     if not articles:
         return 0
 
@@ -103,14 +109,19 @@ def ingest_new_articles(articles):
     return len(all_chunks)
 
 def get_mediassist_chain():
-    """Builds the RAG pipeline. Returns None if the database is empty."""
-    if not os.path.exists(CHROMA_DIR):
+    """Builds the RAG pipeline. Returns None if the RAM database is empty."""
+    vs = get_vectorstore()
+    
+    # Safely check if the in-memory database actually has documents
+    try:
+        if vs._collection.count() == 0:
+            return None
+    except Exception:
         return None
 
-    vs = get_vectorstore()
     retriever = vs.as_retriever(search_kwargs={"k": 5})
-
-    # Strict temperature to prevent hallucinations
+    
+    # CRITICAL: Temperature MUST be low for clinical apps to prevent hallucination
     llm = ChatGroq(model_name=LLM_MODEL, temperature=0.4)
 
     system_prompt = (
