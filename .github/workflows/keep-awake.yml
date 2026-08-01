@@ -3,7 +3,6 @@ name: Keep Streamlit Awake
 on:
   schedule:
     - cron: "0 */6 * * *"
-
   workflow_dispatch:
 
 jobs:
@@ -11,9 +10,5 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Ping Streamlit
-        run: |
-          curl -I https://medi-assist-ai-rag-v2.streamlit.app
+        run: curl -I https://medi-assist-ai-rag-v2.streamlit.app

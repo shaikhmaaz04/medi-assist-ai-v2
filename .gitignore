@@ -11,6 +11,7 @@ wheels/
 
 # Secrets
 .env
+.env.*
 *.env
 
 # Local Vector Database (Start fresh on deployment)
