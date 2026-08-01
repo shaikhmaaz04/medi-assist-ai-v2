@@ -11,4 +11,4 @@ jobs:
 
     steps:
       - name: Ping Streamlit
-        run: curl -I https://medi-assist-ai-rag-v2.streamlit.app
+        run: curl -L https://medi-assist-ai-rag-v2.streamlit.app
