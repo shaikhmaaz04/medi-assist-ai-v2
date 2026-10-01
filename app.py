@@ -31,7 +31,7 @@ st.markdown("""
 
 @st.cache_resource
 def load_chitchat_llm():
-    return ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.7)
+    return ChatGroq(model_name="openai/gpt-oss-20b", temperature=0.7)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
