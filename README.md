@@ -67,7 +67,7 @@ Users can clear the vector database at any time to start researching a completel
 | Component | Technology |
 |---|---|
 | Frontend | Streamlit |
-| AI Model | Groq (`llama-3.3-70b-versatile`) |
+| AI Model | Groq (`openai/gpt-oss-20b`) |
 | Framework | LangChain |
 | Vector Database | ChromaDB |
 | Embeddings | HuggingFace (`sentence-transformers/all-MiniLM-L6-v2`) |

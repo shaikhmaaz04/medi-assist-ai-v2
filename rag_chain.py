@@ -16,7 +16,7 @@ load_dotenv()
 
 COLLECTION = "fasting_research"
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-LLM_MODEL = "llama-3.3-70b-versatile"
+LLM_MODEL = "openai/gpt-oss-20b"
 
 # --- IN-MEMORY DATABASE CONNECTION ---
 _chroma_client = None
